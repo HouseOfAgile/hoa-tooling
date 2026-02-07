@@ -1,38 +1,29 @@
 # hoa-tooling
 
-`hoa-tooling` is a shared tooling repository for all HOA projects, independent of tech stack.
+`hoa-tooling` is a modular repository of reusable tooling/features that can be used in any project, regardless of stack.
 
-It is meant to host reusable project tooling modules. Today it provides:
+It is designed as a toolbox: each tool has its own directory and README.
 
-1. Story System tooling
-2. Docker Makefile system
+## Tools Catalog
 
-More tool modules will be added over time in this same repository.
+### `tools/story-system`
 
-## Tool Modules
+Provides:
+- story template
+- backlog example
+- example stories
+- command docs for story lifecycle (`new`, `review`, `implement`)
 
-### 1) Story System
+See: `tools/story-system/README.md`
 
-Path:
-- `stories/`
-- `.claude/commands/`
+### `tools/docker-makefile-system`
 
-Purpose:
-- standardize user-story writing, review, implementation flow
-- enforce testable acceptance criteria and validation tasks
-- keep backlog structure consistent across projects
+Provides:
+- Docker-oriented Makefile conventions and blueprint
 
-### 2) Docker Makefile System
+See: `tools/docker-makefile-system/README.md`
 
-Path:
-- `hoa-docker-makefile.md`
-
-Purpose:
-- provide a stable Makefile convention for Docker projects
-- keep target naming consistent (`up`, `down`, `logs`, `test`, `migrate`, ...)
-- reduce project-to-project operational friction
-
-## Install In Any Project (Submodule)
+## Install In Any Project (Recommended: Submodule)
 
 From target project root:
 
@@ -41,49 +32,38 @@ git submodule add git@github.com:<org-or-user>/hoa-tooling.git tooling/hoa-tooli
 git submodule update --init --recursive
 ```
 
-## Enable Story System In Target Project
+## Quick Enable Commands
+
+### Enable Story System
 
 ```bash
 mkdir -p stories/by-feature
-cp tooling/hoa-tooling/stories/STORY-TEMPLATE.md stories/STORY-TEMPLATE.md
-cp tooling/hoa-tooling/stories/README.md stories/README.md
-cp tooling/hoa-tooling/stories/backlog.md stories/backlog.md
+cp tooling/hoa-tooling/tools/story-system/STORY-TEMPLATE.md stories/STORY-TEMPLATE.md
+cp tooling/hoa-tooling/tools/story-system/backlog.example.md stories/backlog.md
 mkdir -p .claude/commands
-cp tooling/hoa-tooling/.claude/commands/*.md .claude/commands/
+cp tooling/hoa-tooling/tools/story-system/commands/*.md .claude/commands/
 ```
 
-Then replace example stories/backlog entries with your project-specific scope.
+### Enable Docker Makefile System
 
-## Enable Docker Makefile System In Target Project
-
-1. Open `tooling/hoa-tooling/hoa-docker-makefile.md`
-2. Copy the Makefile blueprint into project root `Makefile`
-3. Adapt internal commands to your stack while keeping target names stable
-
-## Daily Usage Commands (Story Workflow)
-
-```text
-/new-story
-/review-story stories/by-feature/<area>/story-XXX-<slug>.md
-/implement-story stories/by-feature/<area>/story-XXX-<slug>.md
+```bash
+cp tooling/hoa-tooling/tools/docker-makefile-system/hoa-docker-makefile.md ./docs/hoa-docker-makefile.md
 ```
 
-## Update Tooling Version In A Project
+Then create/update project `Makefile` from the blueprint.
+
+## Keep Tooling Updated
 
 ```bash
 git submodule update --remote --merge tooling/hoa-tooling
 ```
 
-## Repository Direction
+## Future Direction
 
-This repository is intentionally modular.
+This repository will grow with additional tooling modules.
 
-Current modules:
-- Story System
-- Docker Makefile system
-
-Planned future modules (examples):
-- CI pipeline templates
-- release/versioning helpers
+Planned categories include:
+- CI/CD templates
+- release/version helpers
 - security checklists
 - repository bootstrap scripts
