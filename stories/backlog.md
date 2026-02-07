@@ -1,70 +1,52 @@
-# Product Backlog
+# Product Backlog (Example)
 
-**Last Updated**: 2026-02-07
-**Total Stories**: 8
-**Completed**: 2
-**In Progress**: 0
-**Backlog**: 6
+> This file is a **template example** showing how to organize a backlog.
+> Replace all example stories with your project-specific backlog.
+
+**Last Updated**: YYYY-MM-DD
+**Total Stories**: 5
+**Completed**: 1
+**In Progress**: 1
+**Backlog**: 3
 
 ---
 
 ## Current Sprint (High Priority)
 
 ### In Progress
-_No stories in progress_
+- [ ] `story-102` Implement checkout fraud checks  
+  `stories/by-feature/payments/story-102-checkout-fraud-checks.md`
 
 ### Completed
-- [x] `story-001` JWT Auth Foundation With Dev Login  
-  `stories/by-feature/auth/story-001-auth-foundation.md`
-- [x] `story-002` Asset Upload And URL Import With Security Controls  
-  `stories/by-feature/assets/story-002-asset-ingestion.md`
+- [x] `story-101` User login with MFA  
+  `stories/by-feature/auth/story-101-login-mfa.md`
 
 ---
 
 ## Next Up
 
-- [ ] `story-101` Automated Validation Suite For Stories 001 And 002  
-  `stories/by-feature/testing/story-101-m1-m2-validation-suite.md`
-- [ ] `story-003` Ranked Asset Search Endpoint  
-  `stories/by-feature/search/story-003-ranked-asset-search.md`
-- [ ] `story-004` Synchronous Image Generation Endpoint  
-  `stories/by-feature/generation/story-004-sync-generation-endpoint.md`
+- [ ] `story-103` Product search autocomplete
+- [ ] `story-104` Order status timeline
+- [ ] `story-105` Notification delivery retries
 
 ---
 
 ## By Feature Area
 
-### User Auth
-- `story-001` (completed)
+### Auth
+- `story-101` (completed)
 
-### Assets
-- `story-002` (completed)
+### Payments
+- `story-102` (in_progress)
 
 ### Search
-- `story-003` (backlog)
+- `story-103` (backlog)
 
-### Generation
-- `story-004` (backlog)
+### Orders
+- `story-104` (backlog)
 
-### Web
-- `story-005` (backlog)
-
-### Admin
-- `story-006` (backlog)
-
-### Infra
-- `story-007` (backlog)
-
-### Testing
-- `story-101` (backlog)
-
----
-
-## Future Enhancements (Icebox)
-
-- Story for first multi-asset composition mode (v2)
-- Story for per-user generation history and quota controls
-- Story for background cleanup/retention policy for generated files
+### Notifications
+- `story-105` (backlog)
 
 ---
 
@@ -72,57 +54,41 @@ _No stories in progress_
 
 | Priority | Count |
 |----------|-------|
-| High     | 5     |
-| Medium   | 3     |
+| High     | 3     |
+| Medium   | 2     |
 | Low      | 0     |
 
 | Status      | Count |
 |-------------|-------|
-| Completed   | 2     |
-| In Progress | 0     |
-| Backlog     | 6     |
+| Completed   | 1     |
+| In Progress | 1     |
+| Backlog     | 3     |
 
 | Complexity | Count |
 |------------|-------|
-| High       | 2     |
-| Medium     | 6     |
-| Low        | 0     |
+| High       | 1     |
+| Medium     | 3     |
+| Low        | 1     |
 
 ---
 
 ## Technical Debt & Infrastructure
 
-- [ ] Add API linting/test framework baseline (Jest + supertest + scripts)
-- [ ] Add CI pipeline step for migrations + story validation suite
-- [ ] Add smoke test script that validates health/auth/assets flows in docker
+- [ ] Add CI check for story validation tasks
+- [ ] Add automated traceability from acceptance criteria to tests
 
 ---
 
 ## Documentation Needs
 
-- [ ] Add API examples collection for auth/assets/search/generate endpoints
-- [ ] Add runbook for whitelist and import security settings
-- [ ] Add runbook for ImageMagick operational troubleshooting
+- [ ] Add contributor guide for story lifecycle
+- [ ] Add examples for backend-only and frontend-only stories
 
 ---
 
-## Notes
+## How To Use This Example
 
-- All stories follow the LLM-optimized template in `STORY-TEMPLATE.md`
-- Each implementation story should include **Validation Tasks** with explicit checks
-- Completed status means code merged; production deployment tracked separately
-- Claude workflow commands are defined in `.claude/commands/`
-
----
-
-**How to Use This Backlog:**
-
-1. **Start a Story**: `/implement-story stories/by-feature/[area]/story-XXX.md`
-2. **Track Progress**: update story frontmatter `status`
-3. **Validate**: execute Validation Tasks and attach evidence in PR
-4. **Review**: run `/review-story` before marking completed
-5. **Link Tests**: tie acceptance criteria to automated tests whenever possible
-
----
-
-> This backlog is a living document. Keep story status and validation evidence current.
+1. Copy this file to your project as `stories/backlog.md`.
+2. Replace example stories with your own IDs/titles/paths.
+3. Keep sections and counters updated weekly.
+4. Require validation evidence before marking stories completed.
