@@ -1,0 +1,392 @@
+# ==== Base ====
+SHELL := /bin/bash
+.DEFAULT_GOAL := help
+
+# ==== Project Context (override per project) ====
+PROJECT_NAME ?= my-project
+SERVICE_NAME ?= app
+STACK ?= node
+DB_TYPE ?= postgresql
+DB_SERVICE ?= db
+PKG_MANAGER ?= npm
+CACHE_SYSTEM ?= redis
+WORKDIR ?= /app
+EXTRA_SERVICES ?=
+
+# ==== Environment Management ====
+VALID_ENVS := dev staging prod
+ENV ?= dev
+ifeq (,$(filter $(ENV),$(VALID_ENVS)))
+$(error Invalid ENV '$(ENV)'. Allowed values: $(VALID_ENVS))
+endif
+
+# ==== Dotenv Loading (Symfony-style precedence) ====
+DOTENV_FILES := .env .env.local .env.$(ENV) .env.$(ENV).local
+LOADED_DOTENV_FILES := $(foreach f,$(DOTENV_FILES),$(wildcard $(f)))
+-include $(LOADED_DOTENV_FILES)
+.EXPORT_ALL_VARIABLES:
+
+# ==== Compose File Resolution ====
+DC_BASE := $(if $(wildcard docker-compose.base.yml),docker-compose.base.yml,docker-compose.yml)
+DC_FILES := $(DC_BASE)
+ifneq ($(wildcard docker-compose.$(ENV).yml),)
+DC_FILES += docker-compose.$(ENV).yml
+endif
+ifneq ($(wildcard docker-compose.local.yml),)
+DC_FILES += docker-compose.local.yml
+endif
+
+COMPOSE = docker compose $(addprefix -f ,$(DC_FILES))
+
+# ==== Backup Settings ====
+BACKUP_DIR ?= data/backups
+DB_KEEP ?= 10
+FULL_KEEP ?= 5
+MEDIA_DIR ?= data/uploads
+DB_NAME ?=
+DB_USER ?=
+REDIS_SERVICE ?= redis
+
+TIMESTAMP = $(shell date +%Y%m%d_%H%M%S)
+TAG_SUFFIX = $(if $(TAG),_$(TAG),)
+
+# ==== Utility ====
+define require_cmd
+	@if [ -z "$(CMD)" ]; then \
+		echo "Error: CMD is required"; \
+		echo "Usage: make $@ CMD=\"...\" [ENV=$(ENV)]"; \
+		exit 1; \
+	fi
+endef
+
+define confirm_or_exit
+	@if [ "$(FORCE)" != "1" ]; then \
+		read -r -p "Confirm $@ (type 'yes'): " REPLY; \
+		[ "$$REPLY" = "yes" ] || { echo "Aborted"; exit 1; }; \
+	fi
+endef
+
+# ==== Core Docker ====
+.PHONY: help print-dc-cmd env-init env-info env-check \
+	up down stop restart rebuild logs logs-% status ps \
+	sh exec npm yarn pnpm console composer phpunit manage pip rails bundle rake go-run go-test \
+	install setup db-migrate test test-all \
+	backup-db restore-db backup-full restore-full list-backups cleanup-backups backup-status backup-help \
+	cache-clear cache-clear-all
+
+print-dc-cmd:
+	@echo "$(COMPOSE)"
+
+env-init:
+	@if [ -f .env ]; then \
+		echo ".env already exists"; \
+	elif [ -f .env.example ]; then \
+		cp .env.example .env; \
+		echo "Created .env from .env.example"; \
+		echo "Review .env values before continuing."; \
+	elif [ -f .env.dist ]; then \
+		cp .env.dist .env; \
+		echo "Created .env from .env.dist"; \
+		echo "Review .env values before continuing."; \
+	else \
+		echo "No .env.example or .env.dist found"; \
+		exit 1; \
+	fi
+
+env-info:
+	@echo "Project:        $(PROJECT_NAME)"
+	@echo "ENV:            $(ENV)"
+	@echo "Main service:   $(SERVICE_NAME)"
+	@echo "DB:             $(DB_TYPE) ($(DB_SERVICE))"
+	@echo "Package mgr:    $(PKG_MANAGER)"
+	@echo "Cache:          $(CACHE_SYSTEM)"
+	@echo "Dotenv files:   $(if $(LOADED_DOTENV_FILES),$(LOADED_DOTENV_FILES),none)"
+	@echo "Compose files:  $(DC_FILES)"
+	@echo "App URL:        http://localhost:$${APP_PORT:-3000}"
+
+env-check:
+	@$(COMPOSE) ps
+	@echo "Checking running services..."
+	@$(COMPOSE) ps --status running >/dev/null || true
+
+up: env-info
+	@$(COMPOSE) up -d --build
+
+down:
+	@$(COMPOSE) down
+
+stop:
+	@$(COMPOSE) stop
+
+restart: stop up
+
+rebuild:
+	@$(COMPOSE) down
+	@$(COMPOSE) build --no-cache
+	@$(COMPOSE) up -d
+
+logs:
+	@$(COMPOSE) logs -f --tail=200
+
+logs-%:
+	@$(COMPOSE) logs -f --tail=200 $*
+
+status: env-info
+	@$(COMPOSE) ps
+
+ps:
+	@$(COMPOSE) ps
+
+# ==== Shell & Exec ====
+sh:
+	@$(COMPOSE) exec $(SERVICE_NAME) bash -lc 'cd $(WORKDIR) && bash' || \
+	$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && sh'
+
+exec:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && $(CMD)'
+
+npm:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && npm $(CMD)'
+
+yarn:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && yarn $(CMD)'
+
+pnpm:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && pnpm $(CMD)'
+
+console:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && php bin/console $(CMD)'
+
+composer:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && composer $(CMD)'
+
+phpunit:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && php ./vendor/bin/phpunit $(CMD)'
+
+manage:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && python manage.py $(CMD)'
+
+pip:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && pip $(CMD)'
+
+rails:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && rails $(CMD)'
+
+bundle:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && bundle $(CMD)'
+
+rake:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && rake $(CMD)'
+
+go-run:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && go run $(CMD)'
+
+go-test:
+	$(call require_cmd)
+	@$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && go test $(CMD)'
+
+# ==== Dependencies & Setup ====
+install:
+	@case "$(PKG_MANAGER)" in \
+		npm) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && npm install' ;; \
+		yarn) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && yarn install' ;; \
+		pnpm) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && pnpm install' ;; \
+		composer) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && composer install' ;; \
+		pip) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && pip install -r requirements.txt' ;; \
+		bundler) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && bundle install' ;; \
+		go) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && go mod download' ;; \
+		*) echo "Unsupported PKG_MANAGER=$(PKG_MANAGER)"; exit 1 ;; \
+	esac
+
+db-migrate:
+	@echo "Set db-migrate implementation for your stack (example: make console CMD=\"doctrine:migrations:migrate -n\"")"
+
+setup: env-init up install
+	@$(MAKE) db-migrate ENV=$(ENV) || true
+
+# ==== Testing ====
+test:
+	@case "$(STACK)" in \
+		node*|next*|express*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && npm test -- --bail' ;; \
+		symfony*|laravel*|php*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && php ./vendor/bin/phpunit' ;; \
+		django*|python*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && pytest -x' ;; \
+		rails*|ruby*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && bundle exec rspec --fail-fast' ;; \
+		go*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && go test ./... -failfast' ;; \
+		*) echo "Set test target for STACK=$(STACK)"; exit 1 ;; \
+	esac
+
+test-all:
+	@$(MAKE) test ENV=$(ENV)
+
+# ==== Backup / Restore ====
+backup-db:
+	@mkdir -p $(BACKUP_DIR)
+	@case "$(DB_TYPE)" in \
+		postgresql) \
+			FILE="$(BACKUP_DIR)/db_$(TIMESTAMP)$(TAG_SUFFIX).pgdump"; \
+			$(COMPOSE) exec -T $(DB_SERVICE) sh -lc 'pg_dump -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -Fc' > "$$FILE"; \
+			echo "Created $$FILE" ;; \
+		mysql) \
+			FILE="$(BACKUP_DIR)/db_$(TIMESTAMP)$(TAG_SUFFIX).sql"; \
+			$(COMPOSE) exec -T $(DB_SERVICE) sh -lc 'mysqldump -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE"' > "$$FILE"; \
+			echo "Created $$FILE" ;; \
+		mongodb) \
+			FILE="$(BACKUP_DIR)/db_$(TIMESTAMP)$(TAG_SUFFIX).archive"; \
+			$(COMPOSE) exec -T $(DB_SERVICE) sh -lc 'mongodump --archive' > "$$FILE"; \
+			echo "Created $$FILE" ;; \
+		none) echo "DB_TYPE=none, skipping" ;; \
+		*) echo "Unsupported DB_TYPE=$(DB_TYPE)"; exit 1 ;; \
+	esac
+
+restore-db:
+	$(call confirm_or_exit)
+	@case "$(DB_TYPE)" in \
+		postgresql) \
+			FILE="$(if $(FILE),$(FILE),$(shell ls -1t $(BACKUP_DIR)/*.pgdump 2>/dev/null | head -n1))"; \
+			[ -n "$$FILE" ] || { echo "No backup file found"; exit 1; }; \
+			cat "$$FILE" | $(COMPOSE) exec -T $(DB_SERVICE) sh -lc 'pg_restore -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" --clean --if-exists' ; \
+			echo "Restored $$FILE" ;; \
+		mysql) \
+			FILE="$(if $(FILE),$(FILE),$(shell ls -1t $(BACKUP_DIR)/*.sql 2>/dev/null | head -n1))"; \
+			[ -n "$$FILE" ] || { echo "No backup file found"; exit 1; }; \
+			cat "$$FILE" | $(COMPOSE) exec -T $(DB_SERVICE) sh -lc 'mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE"' ; \
+			echo "Restored $$FILE" ;; \
+		mongodb) \
+			FILE="$(if $(FILE),$(FILE),$(shell ls -1t $(BACKUP_DIR)/*.archive 2>/dev/null | head -n1))"; \
+			[ -n "$$FILE" ] || { echo "No backup file found"; exit 1; }; \
+			cat "$$FILE" | $(COMPOSE) exec -T $(DB_SERVICE) sh -lc 'mongorestore --archive --drop' ; \
+			echo "Restored $$FILE" ;; \
+		none) echo "DB_TYPE=none, skipping" ;; \
+		*) echo "Unsupported DB_TYPE=$(DB_TYPE)"; exit 1 ;; \
+	esac
+
+backup-full: backup-db
+	@mkdir -p $(BACKUP_DIR)
+	@FULL_FILE="$(BACKUP_DIR)/full_$(TIMESTAMP)$(TAG_SUFFIX).tar.gz"; \
+	if [ -d "$(MEDIA_DIR)" ]; then \
+		tar -czf "$$FULL_FILE" "$(MEDIA_DIR)"; \
+		echo "Created $$FULL_FILE"; \
+	else \
+		echo "Media dir $(MEDIA_DIR) not found, DB backup still created"; \
+	fi
+
+restore-full: restore-db
+	$(call confirm_or_exit)
+	@FULL_FILE="$(if $(FILE),$(FILE),$(shell ls -1t $(BACKUP_DIR)/full_*.tar.gz 2>/dev/null | head -n1))"; \
+	if [ -n "$$FULL_FILE" ]; then \
+		tar -xzf "$$FULL_FILE"; \
+		echo "Restored media from $$FULL_FILE"; \
+	else \
+		echo "No full backup archive found"; \
+	fi
+
+list-backups:
+	@mkdir -p $(BACKUP_DIR)
+	@ls -lhtr $(BACKUP_DIR) || true
+
+cleanup-backups:
+	@mkdir -p $(BACKUP_DIR)
+	@ls -1t $(BACKUP_DIR)/db_* 2>/dev/null | tail -n +$$(( $(DB_KEEP) + 1 )) | xargs -r rm -f
+	@ls -1t $(BACKUP_DIR)/full_* 2>/dev/null | tail -n +$$(( $(FULL_KEEP) + 1 )) | xargs -r rm -f
+	@echo "Cleanup done (db keep=$(DB_KEEP), full keep=$(FULL_KEEP))"
+
+backup-status:
+	@mkdir -p $(BACKUP_DIR)
+	@echo "DB backups:   $$(ls -1 $(BACKUP_DIR)/db_* 2>/dev/null | wc -l | tr -d ' ')"
+	@echo "Full backups: $$(ls -1 $(BACKUP_DIR)/full_* 2>/dev/null | wc -l | tr -d ' ')"
+	@echo "Latest DB:    $$(ls -1t $(BACKUP_DIR)/db_* 2>/dev/null | head -n1 || echo none)"
+	@echo "Latest Full:  $$(ls -1t $(BACKUP_DIR)/full_* 2>/dev/null | head -n1 || echo none)"
+
+backup-help:
+	@echo "Backup commands:"
+	@echo "  make backup-db [TAG=pre-deploy]"
+	@echo "  make restore-db [FILE=data/backups/<file>] [FORCE=1]"
+	@echo "  make backup-full [TAG=pre-deploy]"
+	@echo "  make restore-full [FILE=data/backups/<file>] [FORCE=1]"
+	@echo "  make list-backups"
+	@echo "  make cleanup-backups [DB_KEEP=10] [FULL_KEEP=5]"
+	@echo "  make backup-status"
+
+# ==== Cache ====
+cache-clear:
+	@echo "Clearing app cache for STACK=$(STACK)"
+	@case "$(STACK)" in \
+		symfony*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && php bin/console cache:clear' ;; \
+		laravel*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && php artisan cache:clear && php artisan config:clear && php artisan view:clear' ;; \
+		django*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && python manage.py clear_cache || true' ;; \
+		rails*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && rails tmp:clear' ;; \
+		next*|node*|express*) $(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && rm -rf .next/cache node_modules/.cache || true' ;; \
+		*) echo "No stack-specific cache clear configured" ;; \
+	esac
+	@if [ "$(CACHE_SYSTEM)" = "redis" ]; then \
+		$(COMPOSE) exec -T $(REDIS_SERVICE) sh -lc 'redis-cli FLUSHDB' || true; \
+		echo "Redis cache cleared"; \
+	fi
+
+cache-clear-all: cache-clear
+	@if [ "$(ENV)" = "dev" ]; then \
+		$(COMPOSE) exec $(SERVICE_NAME) sh -lc 'cd $(WORKDIR) && rm -rf .cache tmp/cache var/cache || true'; \
+		echo "Deep cache clean complete"; \
+	else \
+		echo "cache-clear-all is intended for dev; current ENV=$(ENV)"; \
+	fi
+
+# ==== Help ====
+help:
+	@echo "Usage: make [target] [ENV=dev|staging|prod]"
+	@echo ""
+	@echo "Docker:"
+	@echo "  up                 Build and start all services"
+	@echo "  down               Stop and remove all services"
+	@echo "  stop               Stop services without removal"
+	@echo "  restart            Restart services"
+	@echo "  rebuild            Rebuild with no cache and restart"
+	@echo "  logs               Follow logs for all services"
+	@echo "  logs-<svc>         Follow logs for specific service"
+	@echo "  status             Show environment info and compose status"
+	@echo "  ps                 Alias for compose ps"
+	@echo ""
+	@echo "Shell & Commands:"
+	@echo "  sh                 Open shell in main service"
+	@echo "  exec CMD=\"...\"    Run command in main service"
+	@echo "  npm CMD=\"...\"     Run npm subcommand"
+	@echo "  console CMD=\"...\" Run Symfony console command"
+	@echo "  manage CMD=\"...\"  Run Django manage.py command"
+	@echo ""
+	@echo "Database:"
+	@echo "  backup-db          Create database backup"
+	@echo "  restore-db         Restore database backup"
+	@echo "  backup-full        Backup database + media"
+	@echo "  restore-full       Restore database + media"
+	@echo "  list-backups       List backups"
+	@echo "  cleanup-backups    Cleanup old backups"
+	@echo "  backup-status      Show backup health summary"
+	@echo "  backup-help        Print backup help"
+	@echo ""
+	@echo "Environment & Setup:"
+	@echo "  env-init           Create .env from example if missing"
+	@echo "  env-info           Print env and compose resolution"
+	@echo "  env-check          Basic running-services checks"
+	@echo "  install            Install project dependencies"
+	@echo "  setup              First-time setup"
+	@echo ""
+	@echo "Quality:"
+	@echo "  test               Run default test suite"
+	@echo "  test-all           Run all test suites"
+	@echo "  cache-clear        Clear cache"
+	@echo "  cache-clear-all    Deep cache clear (dev)"
+
+-include Makefile.local

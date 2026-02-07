@@ -30,6 +30,8 @@ Path:
 Use when you want:
 - standardized Docker Makefile commands
 - consistent `make up/down/logs/test/migrate` workflow
+- environment-aware compose + dotenv resolution
+- backup/restore/cache/diagnostic targets scaffolded
 
 Agent prompt example:
 - `bootstrap makefile following the tool definition hoa-docker-makefile`
