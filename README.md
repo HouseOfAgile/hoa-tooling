@@ -4,9 +4,19 @@
 
 It is designed as a toolbox: each tool has its own directory and README.
 
+## Tooling Model
+
+1. Add `hoa-tooling` as a submodule in any project.
+2. Ask your AI agent to apply one tool by name.
+3. Agent reads tool definition and bootstraps capabilities in that project.
+
+This keeps workflows consistent while staying stack-agnostic.
+
 ## Tools Catalog
 
-### `tools/story-system`
+See full index: `tools/README.md`
+
+### `story-system`
 
 Provides:
 - story template
@@ -16,7 +26,7 @@ Provides:
 
 See: `tools/story-system/README.md`
 
-### `tools/docker-makefile-system`
+### `hoa-docker-makefile`
 
 Provides:
 - Docker-oriented Makefile conventions and blueprint
@@ -32,25 +42,17 @@ git submodule add git@github.com:<org-or-user>/hoa-tooling.git tooling/hoa-tooli
 git submodule update --init --recursive
 ```
 
-## Quick Enable Commands
+## Agent Activation Prompts
 
-### Enable Story System
+After adding the submodule, tell your agent one of these:
 
-```bash
-mkdir -p stories/by-feature
-cp tooling/hoa-tooling/tools/story-system/STORY-TEMPLATE.md stories/STORY-TEMPLATE.md
-cp tooling/hoa-tooling/tools/story-system/backlog.example.md stories/backlog.md
-mkdir -p .claude/commands
-cp tooling/hoa-tooling/tools/story-system/commands/*.md .claude/commands/
-```
+- `add the story system to this project`
+- `bootstrap makefile following the tool definition hoa-docker-makefile`
 
-### Enable Docker Makefile System
+You can keep this phrasing pattern for future tools:
+- `apply tool <tool-name> to this project`
 
-```bash
-cp tooling/hoa-tooling/tools/docker-makefile-system/hoa-docker-makefile.md ./docs/hoa-docker-makefile.md
-```
-
-Then create/update project `Makefile` from the blueprint.
+Manual setup commands are documented in each tool README.
 
 ## Keep Tooling Updated
 

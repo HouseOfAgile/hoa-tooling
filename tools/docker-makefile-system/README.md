@@ -22,6 +22,12 @@ cp tooling/hoa-tooling/tools/docker-makefile-system/hoa-docker-makefile.md ./doc
 
 Then create/update your root `Makefile` by following that blueprint.
 
+## Agent Prompt (Recommended)
+
+After adding `hoa-tooling` as submodule, tell your agent:
+
+- `bootstrap makefile following the tool definition hoa-docker-makefile`
+
 ## Recommended Stable Targets
 
 - `make up`

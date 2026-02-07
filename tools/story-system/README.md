@@ -36,6 +36,12 @@ Then:
 2. Keep acceptance criteria testable.
 3. Require `Validation Tasks` in every implementation story.
 
+## Agent Prompt (Recommended)
+
+After adding `hoa-tooling` as submodule, tell your agent:
+
+- `add the story system to this project`
+
 ## Workflow Commands
 
 ```text
