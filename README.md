@@ -38,7 +38,7 @@ See: `tools/docker-makefile-system/README.md`
 From target project root:
 
 ```bash
-git submodule add git@github.com:<org-or-user>/hoa-tooling.git tooling/hoa-tooling
+git submodule add git@github.com:HouseOfAgile/hoa-tooling.git tooling/hoa-tooling
 git submodule update --init --recursive
 ```
 
