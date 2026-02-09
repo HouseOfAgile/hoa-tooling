@@ -36,6 +36,19 @@ Use when you want:
 Agent prompt example:
 - `bootstrap makefile following the tool definition hoa-docker-makefile`
 
+## `activity-log`
+
+Path:
+- `tools/activity-log/`
+
+Use when you want:
+- standardized session tracking across AI agents
+- continuity between agent sessions (what was done, what's pending)
+- local-only, gitignored activity log per project
+
+Agent prompt example:
+- `set up the activity log for this project`
+
 ## Pattern For Future Tools
 
 When adding a new tool:
